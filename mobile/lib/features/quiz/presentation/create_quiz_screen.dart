@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../providers/quiz_list_provider.dart';
+import '../quiz_subjects.dart';
+import '../../profile/providers/visible_level_provider.dart';
 
 class _QuestionDraft {
   _QuestionDraft({required this.optionCount})
@@ -59,10 +61,15 @@ class CreateQuizScreen extends ConsumerStatefulWidget {
 
 class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
   final _topicController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _scrollController = ScrollController();
   final _questions = <_QuestionDraft>[];
   final _questionKeys = <GlobalKey>[];
   int _optionCount = 4;
+  bool _hasTimeLimit = false;
+  int _timeLimitMinutes = 25;
+  String? _level;
+  String? _subject;
   bool _saving = false;
 
   @override
@@ -74,6 +81,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
   @override
   void dispose() {
     _topicController.dispose();
+    _descriptionController.dispose();
     _scrollController.dispose();
     for (final q in _questions) {
       q.dispose();
@@ -143,7 +151,10 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
       _questions.where((q) => q.isComplete && q.correctAnswerConfirmed).toList();
 
   String? _validate() {
+    if (_level == null) return 'Select O/L or A/L';
+    if (_subject == null) return 'Select a subject';
     if (_topicController.text.trim().isEmpty) return 'Enter a topic';
+    if (_descriptionController.text.trim().isEmpty) return 'Enter a description';
     final complete = _completeQuestions;
     if (complete.isEmpty) return 'Add at least one complete question';
     for (var i = 0; i < _questions.length; i++) {
@@ -170,14 +181,27 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
     setState(() => _saving = true);
     try {
       final dio = ref.read(dioProvider);
+      final visibleLevels = ref.read(visibleLevelProvider);
+      final level = visibleLevels.singleLevel ?? _level;
+      if (level == null) {
+        setState(() => _saving = false);
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Select O/L or A/L')));
+        return;
+      }
       final topic = _topicController.text.trim();
+      final description = _descriptionController.text.trim();
       final complete = _completeQuestions;
       final res = await dio.post('/quizzes', data: {
         'title': topic,
-        'description': 'Topic: $topic',
+        'description': description,
         'visibility': 'public',
-        'time_limit_minutes': 30,
-        'metadata_extra': {'topic': topic, 'option_count': _optionCount},
+        'time_limit_minutes': _hasTimeLimit ? _timeLimitMinutes : null,
+        'metadata_extra': {
+          'topic': topic,
+          'option_count': _optionCount,
+          'level': level,
+          'subject': _subject,
+        },
         'questions': complete.asMap().entries.map((e) => e.value.toJson(e.key)).toList(),
       });
       final quizId = res.data['id'];
@@ -199,18 +223,30 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final visibleLevels = ref.watch(visibleLevelProvider);
+    final lockedLevel = visibleLevels.singleLevel;
+
+    ref.listen<VisibleLevels>(visibleLevelProvider, (prev, next) {
+      final nextLocked = next.singleLevel;
+      if (nextLocked != null) {
+        setState(() {
+          _level = nextLocked;
+          _subject = null;
+        });
+      } else if (prev?.singleLevel != null) {
+        setState(() {
+          _level = null;
+          _subject = null;
+        });
+      }
+    });
+
+    final activeLevel = lockedLevel ?? _level;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       appBar: AppBar(
         title: const Text('New quiz'),
-        actions: [
-          TextButton(
-            onPressed: _saving ? null : _save,
-            child: _saving
-                ? const SizedBox(width: 18, height: 18, child: CircularProgressIndicator(strokeWidth: 2))
-                : const Text('Save', style: TextStyle(fontWeight: FontWeight.w600)),
-          ),
-        ],
       ),
       body: ListView(
         controller: _scrollController,
@@ -218,12 +254,121 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
         children: [
           Text('Create a quiz', style: Theme.of(context).textTheme.headlineSmall),
           const SizedBox(height: 6),
-          Text('Add your topic, questions, and mark the correct answer for each.', style: Theme.of(context).textTheme.bodyMedium),
+          Text('Add your subject, topic, description, timer, questions, and mark the correct answer for each.', style: Theme.of(context).textTheme.bodyMedium),
+          const SizedBox(height: 24),
+          if (lockedLevel != null)
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(16),
+                border: Border.all(color: AppColors.border),
+              ),
+              child: Row(
+                children: [
+                  const Icon(Icons.school_outlined, color: AppColors.textSecondary, size: 20),
+                  const SizedBox(width: 10),
+                  Text(
+                    'Creating ${QuizSubjects.levelLabel(lockedLevel)} quiz',
+                    style: const TextStyle(fontWeight: FontWeight.w600),
+                  ),
+                  const Spacer(),
+                  Text('Change in Profile', style: Theme.of(context).textTheme.bodySmall),
+                ],
+              ),
+            )
+          else ...[
+            Text('Level', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            Row(
+              children: [
+                if (visibleLevels.ol)
+                  _OptionCountChip(
+                    label: 'O/L',
+                    selected: activeLevel == QuizSubjects.ol,
+                    onTap: () => setState(() {
+                      _level = QuizSubjects.ol;
+                      _subject = null;
+                    }),
+                  ),
+                if (visibleLevels.ol && visibleLevels.al) const SizedBox(width: 10),
+                if (visibleLevels.al)
+                  _OptionCountChip(
+                    label: 'A/L',
+                    selected: activeLevel == QuizSubjects.al,
+                    onTap: () => setState(() {
+                      _level = QuizSubjects.al;
+                      _subject = null;
+                    }),
+                  ),
+              ],
+            ),
+          ],
+          if (activeLevel != null) ...[
+            const SizedBox(height: 24),
+            Text('Subject', style: Theme.of(context).textTheme.titleMedium),
+            const SizedBox(height: 12),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: QuizSubjects.subjectsForLevel(activeLevel).map((subject) {
+                return SubjectChip(
+                  label: QuizSubjects.subjectLabel(subject),
+                  subjectKey: subject,
+                  selected: _subject == subject,
+                  onTap: () => setState(() => _subject = subject),
+                );
+              }).toList(),
+            ),
+          ],
           const SizedBox(height: 24),
           TextFormField(
             controller: _topicController,
             decoration: const InputDecoration(hintText: 'Topic', prefixIcon: Icon(Icons.topic_outlined, color: AppColors.textSecondary)),
           ),
+          const SizedBox(height: 16),
+          TextFormField(
+            controller: _descriptionController,
+            decoration: const InputDecoration(
+              hintText: 'Description',
+              alignLabelWithHint: true,
+            ),
+            maxLines: 4,
+            minLines: 3,
+          ),
+          const SizedBox(height: 24),
+          Row(
+            children: [
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Time limit', style: Theme.of(context).textTheme.titleMedium),
+                    const SizedBox(height: 2),
+                    Text('Optional', style: Theme.of(context).textTheme.bodySmall),
+                  ],
+                ),
+              ),
+              Switch(
+                value: _hasTimeLimit,
+                activeThumbColor: AppColors.white,
+                activeTrackColor: AppColors.black,
+                onChanged: (on) => setState(() => _hasTimeLimit = on),
+              ),
+            ],
+          ),
+          if (_hasTimeLimit) ...[
+            const SizedBox(height: 8),
+            Text('Duration: $_timeLimitMinutes min', style: Theme.of(context).textTheme.titleMedium),
+            Slider(
+              value: _timeLimitMinutes.toDouble(),
+              min: 5,
+              max: 120,
+              divisions: 23,
+              activeColor: AppColors.black,
+              onChanged: (v) => setState(() => _timeLimitMinutes = v.round()),
+            ),
+          ],
           const SizedBox(height: 24),
           Text('Answers per question', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 12),
@@ -235,13 +380,7 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
             ],
           ),
           const SizedBox(height: 28),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              Text('Questions', style: Theme.of(context).textTheme.titleMedium),
-              TextButton.icon(onPressed: () => _addQuestion(scrollToNew: true), icon: const Icon(Icons.add, size: 18), label: const Text('Add question')),
-            ],
-          ),
+          Text('Questions', style: Theme.of(context).textTheme.titleMedium),
           const SizedBox(height: 8),
           ..._questions.asMap().entries.map((entry) {
             final index = entry.key;

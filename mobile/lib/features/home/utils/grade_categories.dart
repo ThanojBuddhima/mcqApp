@@ -9,25 +9,29 @@ class GradeCategory {
 }
 
 class GradeCategories {
-  static const _juniorGrades = {'6', '7', '8', '9', 'O/L'};
-
-  static List<GradeCategory> forGrade(String? grade) {
-    if (grade == 'A/L') {
+  static List<GradeCategory> forLevel(String level) {
+    if (level == 'al') {
       return const [
         GradeCategory('Physics', 'A/L papers', Icons.science_outlined),
         GradeCategory('Chemistry', 'A/L papers', Icons.water_drop_outlined),
         GradeCategory('Biology', 'A/L papers', Icons.biotech_outlined),
       ];
     }
-    if (grade != null && _juniorGrades.contains(grade)) {
-      return const [
-        GradeCategory('Maths', 'Practice quizzes', Icons.calculate_outlined),
-        GradeCategory('Science', 'Practice quizzes', Icons.science_outlined),
-      ];
-    }
     return const [
       GradeCategory('Maths', 'Practice quizzes', Icons.calculate_outlined),
       GradeCategory('Science', 'Practice quizzes', Icons.science_outlined),
     ];
+  }
+
+  static List<GradeCategory> forLevels(Set<String> levels) {
+    if (levels.contains('al') && levels.contains('ol')) {
+      return [...forLevel('ol'), ...forLevel('al')];
+    }
+    if (levels.contains('al')) return forLevel('al');
+    return forLevel('ol');
+  }
+
+  static List<GradeCategory> forGrade(String? grade) {
+    return forLevel(grade == 'A/L' ? 'al' : 'ol');
   }
 }

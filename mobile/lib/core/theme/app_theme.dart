@@ -2,8 +2,9 @@ import 'package:flutter/material.dart';
 import 'app_colors.dart';
 
 class AppTheme {
-  static const _radius = 20.0;
-  static const _radiusPill = 100.0;
+  static const radius = 20.0;
+  static const radiusPill = 100.0;
+  static const fieldRadius = radius;
 
   static ThemeData get light => ThemeData(
         useMaterial3: true,
@@ -42,7 +43,7 @@ class AppTheme {
             foregroundColor: AppColors.white,
             elevation: 0,
             padding: const EdgeInsets.symmetric(horizontal: 32, vertical: 18),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radiusPill)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusPill)),
             textStyle: const TextStyle(fontSize: 15, fontWeight: FontWeight.w600),
           ),
         ),
@@ -51,7 +52,7 @@ class AppTheme {
             foregroundColor: AppColors.textPrimary,
             side: const BorderSide(color: AppColors.border),
             padding: const EdgeInsets.symmetric(horizontal: 28, vertical: 16),
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radiusPill)),
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusPill)),
           ),
         ),
         textButtonTheme: TextButtonThemeData(
@@ -64,9 +65,11 @@ class AppTheme {
           filled: true,
           fillColor: AppColors.surface,
           contentPadding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
-          border: OutlineInputBorder(borderRadius: BorderRadius.circular(_radiusPill), borderSide: BorderSide.none),
-          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_radiusPill), borderSide: const BorderSide(color: AppColors.border)),
-          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(_radiusPill), borderSide: const BorderSide(color: AppColors.borderStrong, width: 1.5)),
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(fieldRadius), borderSide: BorderSide.none),
+          enabledBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(fieldRadius), borderSide: const BorderSide(color: AppColors.border)),
+          focusedBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(fieldRadius), borderSide: const BorderSide(color: AppColors.borderStrong, width: 1.5)),
+          errorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(fieldRadius), borderSide: const BorderSide(color: AppColors.error)),
+          focusedErrorBorder: OutlineInputBorder(borderRadius: BorderRadius.circular(fieldRadius), borderSide: const BorderSide(color: AppColors.error, width: 1.5)),
           labelStyle: const TextStyle(color: AppColors.textSecondary),
           hintStyle: const TextStyle(color: AppColors.textTertiary),
         ),
@@ -74,7 +77,7 @@ class AppTheme {
           color: AppColors.white,
           elevation: 0,
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(_radius),
+            borderRadius: BorderRadius.circular(radius),
             side: const BorderSide(color: AppColors.border),
           ),
         ),
@@ -83,7 +86,7 @@ class AppTheme {
           backgroundColor: AppColors.white,
           selectedColor: AppColors.white,
           side: const BorderSide(color: AppColors.border),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(_radiusPill)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radiusPill)),
           labelStyle: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w500),
         ),
         floatingActionButtonTheme: const FloatingActionButtonThemeData(
@@ -99,7 +102,7 @@ class AppTheme {
         snackBarTheme: SnackBarThemeData(
           backgroundColor: AppColors.textPrimary,
           contentTextStyle: const TextStyle(color: AppColors.white),
-          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
           behavior: SnackBarBehavior.floating,
         ),
         pageTransitionsTheme: const PageTransitionsTheme(

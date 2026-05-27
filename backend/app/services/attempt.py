@@ -36,6 +36,21 @@ class AttemptService:
         )
         return result.scalar_one_or_none()
 
+    async def list_attempts_for_user_quiz(
+        self, db: AsyncSession, quiz_id: UUID, user_id: UUID
+    ) -> list[QuizAttempt]:
+        result = await db.execute(
+            select(QuizAttempt)
+            .options(selectinload(QuizAttempt.answers))
+            .where(
+                QuizAttempt.quiz_id == quiz_id,
+                QuizAttempt.user_id == user_id,
+                QuizAttempt.status == AttemptStatus.SUBMITTED,
+            )
+            .order_by(QuizAttempt.submitted_at.desc())
+        )
+        return list(result.scalars().all())
+
     async def submit_answers(
         self, db: AsyncSession, attempt: QuizAttempt, answers: list[AnswerSubmit]
     ) -> QuizAttempt:

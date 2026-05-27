@@ -6,6 +6,8 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../profile/providers/visible_level_provider.dart';
+import '../../quiz/quiz_subjects.dart';
 
 class PastPapersScreen extends ConsumerStatefulWidget {
   const PastPapersScreen({super.key});
@@ -88,12 +90,24 @@ class _PastPapersScreenState extends ConsumerState<PastPapersScreen> {
   }
 }
 
-class ProfileScreen extends ConsumerWidget {
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  VisibleLevels? _pendingLevels;
+
+  @override
+  Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
+    final activeLevels = ref.watch(visibleLevelProvider);
+    final selectedLevels = _pendingLevels ?? activeLevels;
+    final registeredLevel = QuizSubjects.levelForUserGrade(user?['grade'] as String?);
+    final filterDirty = selectedLevels != activeLevels;
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -146,6 +160,77 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
             const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: AppColors.surface,
+                borderRadius: BorderRadius.circular(28),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Visible content', style: Theme.of(context).textTheme.titleMedium),
+                  const SizedBox(height: 6),
+                  Text(
+                    'Choose O/L and/or A/L content for Courses, Home, and quiz creation. '
+                    'Select at least one. Your registered grade is ${QuizSubjects.levelLabel(registeredLevel)}.',
+                    style: Theme.of(context).textTheme.bodySmall,
+                  ),
+                  const SizedBox(height: 16),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: _LevelFilterChip(
+                          label: 'O/L',
+                          selected: selectedLevels.ol,
+                          onTap: () => setState(() {
+                            _pendingLevels = selectedLevels.toggle(QuizSubjects.ol);
+                          }),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Expanded(
+                        child: _LevelFilterChip(
+                          label: 'A/L',
+                          selected: selectedLevels.al,
+                          onTap: () => setState(() {
+                            _pendingLevels = selectedLevels.toggle(QuizSubjects.al);
+                          }),
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  Text(
+                    'Showing ${activeLevels.label} subjects',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 48,
+                    child: FilledButton(
+                      onPressed: filterDirty
+                          ? () async {
+                              await ref.read(visibleLevelProvider.notifier).applyLevels(selectedLevels);
+                              if (context.mounted) {
+                                setState(() => _pendingLevels = null);
+                                ScaffoldMessenger.of(context).showSnackBar(
+                                  SnackBar(
+                                    content: Text('Now showing ${selectedLevels.label} content'),
+                                    behavior: SnackBarBehavior.floating,
+                                  ),
+                                );
+                              }
+                            }
+                          : null,
+                      child: const Text('Apply filter'),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 16),
             _profileMenu(context, Icons.favorite_border, 'Favorites', () => context.push('/favorites')),
             _profileMenu(context, Icons.groups_outlined, 'Classes', () => context.push('/classes')),
             _profileMenu(context, Icons.upload_file_outlined, 'Upload Paper', () => context.push('/upload')),
@@ -187,6 +272,42 @@ class ProfileScreen extends ConsumerWidget {
             title: Text(title, style: const TextStyle(fontWeight: FontWeight.w600)),
             trailing: const Icon(Icons.chevron_right, color: AppColors.textSecondary),
             onTap: onTap,
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _LevelFilterChip extends StatelessWidget {
+  const _LevelFilterChip({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.black : AppColors.white,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          padding: const EdgeInsets.symmetric(vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: selected ? AppColors.black : AppColors.border, width: selected ? 2 : 1),
+          ),
+          alignment: Alignment.center,
+          child: Text(
+            label,
+            style: TextStyle(
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+              color: selected ? AppColors.white : AppColors.textPrimary,
+            ),
           ),
         ),
       ),

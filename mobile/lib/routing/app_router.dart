@@ -11,6 +11,7 @@ import '../../features/engagement/presentation/engagement_screens.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/past_papers/presentation/past_papers_screen.dart';
 import '../../features/productivity/presentation/timer_screen.dart';
+import '../../features/quiz/presentation/create_hub_screen.dart';
 import '../../features/quiz/presentation/create_quiz_screen.dart';
 import '../../features/quiz/presentation/quiz_detail_screen.dart';
 import '../../features/quiz/presentation/quiz_screens.dart';
@@ -79,7 +80,12 @@ final routerProvider = Provider<GoRouter>((ref) {
           StatefulShellBranch(routes: [shellTabRoute('/profile', const ProfileScreen())]),
         ],
       ),
-      appRoute(path: '/upload', transition: AppTransition.slideUp, builder: (_, __) => const UploadScreen()),
+      appRoute(path: '/create', transition: AppTransition.slideUp, builder: (_, __) => const CreateHubScreen()),
+      appRoute(
+        path: '/upload',
+        transition: AppTransition.slideUp,
+        builder: (_, s) => UploadScreen(mode: s.uri.queryParameters['mode']),
+      ),
       appRoute(path: '/timer', transition: AppTransition.slideUp, builder: (_, __) => const ProductivityTimerScreen()),
       appRoute(path: '/my-quizzes', builder: (_, __) => const MyQuizzesScreen()),
       appRoute(path: '/favorites', builder: (_, __) => const FavoritesScreen()),

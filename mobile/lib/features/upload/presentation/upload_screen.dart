@@ -11,7 +11,10 @@ import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 
 class UploadScreen extends ConsumerStatefulWidget {
-  const UploadScreen({super.key});
+  const UploadScreen({super.key, this.mode});
+
+  /// `scan`, `pdf`, or `gallery` — auto-starts the matching picker when set.
+  final String? mode;
 
   @override
   ConsumerState<UploadScreen> createState() => _UploadScreenState();
@@ -22,6 +25,34 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
   Map<String, dynamic>? _jobStatus;
   Timer? _pollTimer;
   bool _uploading = false;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.mode != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => _runModeAction());
+    }
+  }
+
+  Future<void> _runModeAction() async {
+    switch (widget.mode) {
+      case 'scan':
+        await _pickCamera();
+      case 'pdf':
+        await _pickPdf();
+      case 'gallery':
+        await _pickGallery();
+    }
+  }
+
+  String get _title {
+    return switch (widget.mode) {
+      'scan' => 'Scan paper',
+      'pdf' => 'Upload PDF',
+      'gallery' => 'Choose photo',
+      _ => 'Upload paper',
+    };
+  }
 
   @override
   void dispose() {
@@ -103,34 +134,59 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
     final status = _jobStatus?['status'] ?? '';
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Upload paper')),
+      appBar: AppBar(title: Text(_title)),
       body: Padding(
         padding: const EdgeInsets.all(24),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              'Upload a scanned paper, photo, or PDF. PaddleOCR will extract Sinhala & English text and preserve diagrams.',
-              style: Theme.of(context).textTheme.bodyMedium,
-            ),
-            const SizedBox(height: 32),
-            _UploadOption(
-              icon: Icons.camera_alt_outlined,
-              label: 'Take photo',
-              onTap: _uploading ? null : _pickCamera,
-            ),
-            const SizedBox(height: 12),
-            _UploadOption(
-              icon: Icons.photo_library_outlined,
-              label: 'Choose from gallery',
-              onTap: _uploading ? null : _pickGallery,
-            ),
-            const SizedBox(height: 12),
-            _UploadOption(
-              icon: Icons.picture_as_pdf_outlined,
-              label: 'Upload PDF',
-              onTap: _uploading ? null : _pickPdf,
-            ),
+            if (widget.mode == null) ...[
+              Text(
+                'Upload a scanned paper, photo, or PDF. PaddleOCR will extract Sinhala & English text and preserve diagrams.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 32),
+              _UploadOption(
+                icon: Icons.camera_alt_outlined,
+                label: 'Take photo',
+                onTap: _uploading ? null : _pickCamera,
+              ),
+              const SizedBox(height: 12),
+              _UploadOption(
+                icon: Icons.photo_library_outlined,
+                label: 'Choose from gallery',
+                onTap: _uploading ? null : _pickGallery,
+              ),
+              const SizedBox(height: 12),
+              _UploadOption(
+                icon: Icons.picture_as_pdf_outlined,
+                label: 'Upload PDF',
+                onTap: _uploading ? null : _pickPdf,
+              ),
+            ] else if (_jobStatus == null && !_uploading) ...[
+              Text(
+                widget.mode == 'scan'
+                    ? 'Point your camera at the paper. OCR will extract questions automatically.'
+                    : widget.mode == 'pdf'
+                        ? 'Select a PDF file to upload and process.'
+                        : 'Pick a photo from your gallery to scan.',
+                style: Theme.of(context).textTheme.bodyMedium,
+              ),
+              const SizedBox(height: 32),
+              _UploadOption(
+                icon: widget.mode == 'scan'
+                    ? Icons.camera_alt_outlined
+                    : widget.mode == 'pdf'
+                        ? Icons.picture_as_pdf_outlined
+                        : Icons.photo_library_outlined,
+                label: widget.mode == 'scan'
+                    ? 'Open camera'
+                    : widget.mode == 'pdf'
+                        ? 'Choose PDF'
+                        : 'Open gallery',
+                onTap: _uploading ? null : _runModeAction,
+              ),
+            ],
             if (_uploading) ...[
               const SizedBox(height: 40),
               const Center(child: CircularProgressIndicator(color: AppColors.black)),

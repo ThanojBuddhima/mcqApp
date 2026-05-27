@@ -7,6 +7,8 @@ import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/section_header.dart';
 import '../utils/grade_categories.dart';
 import '../../auth/providers/auth_provider.dart';
+import '../../profile/providers/visible_level_provider.dart';
+import '../../quiz/quiz_subjects.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
   const HomeScreen({super.key});
@@ -42,12 +44,16 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final user = ref.watch(authProvider).user;
+    final visibleLevels = ref.watch(visibleLevelProvider);
     final name = (user?['display_name'] as String?)?.split(' ').first ?? 'Student';
     final progress = (_analytics?['avg_percentage'] as num?)?.toInt() ?? 0;
     final attempts = _analytics?['total_attempts'] ?? 0;
-    final firstQuiz = _quizzes.isNotEmpty ? _quizzes.first : null;
-    final grade = user?['grade'] as String?;
-    final categories = GradeCategories.forGrade(grade);
+    final levelQuizzes = _quizzes.where((q) {
+      final metadata = q['metadata_extra'] as Map<String, dynamic>?;
+      return QuizSubjects.matchesLevels(metadata, visibleLevels.levelSet);
+    }).toList();
+    final firstQuiz = levelQuizzes.isNotEmpty ? levelQuizzes.first : null;
+    final categories = GradeCategories.forLevels(visibleLevels.levelSet);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -162,7 +168,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 ),
               ),
               SectionHeader(title: 'Recent quizzes', onSeeAll: () => context.go('/quizzes')),
-              ..._quizzes.take(3).map((q) => Padding(
+              ...levelQuizzes.take(3).map((q) => Padding(
                     padding: const EdgeInsets.fromLTRB(20, 0, 20, 12),
                     child: _RecentCard(
                       title: q['title'] ?? '',
@@ -295,8 +301,12 @@ class _CategoryCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final subjectKey = QuizSubjects.filterKey(title);
+    final color = QuizSubjects.subjectColor(subjectKey);
+    final surface = QuizSubjects.subjectSurface(subjectKey);
+
     return Material(
-      color: AppColors.surface,
+      color: subjectKey != null ? surface : AppColors.surface,
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         onTap: onTap,
@@ -306,7 +316,7 @@ class _CategoryCard extends StatelessWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Icon(icon, color: AppColors.textPrimary, size: 26),
+              Icon(icon, color: subjectKey != null ? color : AppColors.textPrimary, size: 26),
               const Spacer(),
               Text(title, style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15, color: AppColors.textPrimary)),
               Text(count, style: const TextStyle(color: AppColors.textSecondary, fontSize: 12)),

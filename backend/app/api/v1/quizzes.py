@@ -89,6 +89,15 @@ async def publish_quiz(
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
 
 
+@router.get("/{quiz_id}/attempts/me", response_model=list[AttemptResponse])
+async def list_my_quiz_attempts(
+    quiz_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    return await attempt_service.list_attempts_for_user_quiz(db, quiz_id, user.id)
+
+
 @router.post("/{quiz_id}/attempts", response_model=AttemptResponse, status_code=status.HTTP_201_CREATED)
 async def start_attempt(
     quiz_id: UUID,

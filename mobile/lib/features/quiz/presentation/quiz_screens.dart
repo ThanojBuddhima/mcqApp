@@ -1,10 +1,15 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../productivity/providers/timer_provider.dart';
 import '../providers/quiz_list_provider.dart';
+import '../quiz_subjects.dart';
+import '../../profile/providers/visible_level_provider.dart';
 
 class QuizListScreen extends ConsumerStatefulWidget {
   const QuizListScreen({super.key});
@@ -38,8 +43,32 @@ class _QuizListScreenState extends ConsumerState<QuizListScreen> {
     }
   }
 
+  List<dynamic> get _levelQuizzes {
+    final levels = ref.read(visibleLevelProvider).levelSet;
+    return _quizzes.where((q) {
+      final metadata = q['metadata_extra'] as Map<String, dynamic>?;
+      return QuizSubjects.matchesLevels(metadata, levels);
+    }).toList();
+  }
+
+  List<dynamic> get _visibleQuizzes {
+    final levelQuizzes = _levelQuizzes;
+    if (_filter == 'All') return levelQuizzes;
+    return levelQuizzes.where((q) {
+      final metadata = q['metadata_extra'] as Map<String, dynamic>?;
+      return QuizSubjects.matchesFilter(metadata, _filter);
+    }).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
+    final visibleLevels = ref.watch(visibleLevelProvider);
+    final courseFilters = QuizSubjects.courseFiltersForLevels(visibleLevels.levelSet);
+
+    ref.listen<VisibleLevels>(visibleLevelProvider, (prev, next) {
+      if (prev != next) setState(() => _filter = 'All');
+    });
+
     ref.listen<int>(quizListRefreshProvider, (prev, next) {
       if (prev != next) _load();
     });
@@ -47,115 +76,143 @@ class _QuizListScreenState extends ConsumerState<QuizListScreen> {
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
-        child: _loading
-            ? const Center(child: CircularProgressIndicator())
-            : CustomScrollView(
-                slivers: [
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Text('Courses', style: Theme.of(context).textTheme.headlineMedium),
-                          const SizedBox(height: 4),
-                          Text('Browse and practice quizzes', style: Theme.of(context).textTheme.bodyMedium),
-                          const SizedBox(height: 16),
-                          SingleChildScrollView(
-                            scrollDirection: Axis.horizontal,
-                            child: Row(
-                              children: ['All', 'Physics', 'Math'].map((f) {
-                                final sel = _filter == f;
-                                return Padding(
-                                  padding: const EdgeInsets.only(right: 10),
-                                  child: FilterChip(
-                                    label: Text(f),
-                                    selected: sel,
-                                    onSelected: (_) => setState(() => _filter = f),
-                                    backgroundColor: AppColors.white,
-                                    selectedColor: AppColors.white,
-                                    side: BorderSide(color: sel ? AppColors.borderStrong : AppColors.border, width: sel ? 1.5 : 1),
-                                    labelStyle: TextStyle(color: AppColors.textPrimary, fontWeight: sel ? FontWeight.w600 : FontWeight.w400),
-                                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
-                                    showCheckmark: false,
-                                  ),
-                                );
-                              }).toList(),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('Courses', style: Theme.of(context).textTheme.headlineMedium),
+                  const SizedBox(height: 4),
+                  Text('Browse and practice quizzes', style: Theme.of(context).textTheme.bodyMedium),
+                  const SizedBox(height: 4),
+                  Text(
+                    '${visibleLevels.label} content',
+                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                  ),
+                  const SizedBox(height: 16),
+                  SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: courseFilters.map((f) {
+                        final sel = _filter == f;
+                        final subjectKey = QuizSubjects.filterKey(f);
+                        if (subjectKey == null) {
+                          return Padding(
+                            padding: const EdgeInsets.only(right: 10),
+                            child: FilterChip(
+                              label: Text(f),
+                              selected: sel,
+                              onSelected: (_) => setState(() => _filter = f),
+                              backgroundColor: AppColors.white,
+                              selectedColor: AppColors.white,
+                              side: BorderSide(color: sel ? AppColors.borderStrong : AppColors.border, width: sel ? 1.5 : 1),
+                              labelStyle: TextStyle(color: AppColors.textPrimary, fontWeight: sel ? FontWeight.w600 : FontWeight.w400),
+                              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(100)),
+                              showCheckmark: false,
                             ),
+                          );
+                        }
+                        return Padding(
+                          padding: const EdgeInsets.only(right: 10),
+                          child: SubjectChip(
+                            label: f,
+                            subjectKey: subjectKey,
+                            selected: sel,
+                            onTap: () => setState(() => _filter = f),
+                            compact: true,
                           ),
-                        ],
-                      ),
+                        );
+                      }).toList(),
                     ),
                   ),
-                  _quizzes.isEmpty
-                      ? const SliverFillRemaining(child: Center(child: Text('No quizzes yet')))
-                      : SliverPadding(
-                          padding: const EdgeInsets.all(20),
-                          sliver: SliverList(
-                            delegate: SliverChildBuilderDelegate(
-                              (context, i) {
-                                final q = _quizzes[i];
-                                final questionCount = (q['questions'] as List?)?.length ?? 0;
-                                return Padding(
-                                  padding: const EdgeInsets.only(bottom: 12),
-                                  child: Material(
-                                    color: AppColors.white,
-                                    borderRadius: BorderRadius.circular(20),
-                                    child: InkWell(
-                                      onTap: () => context.push('/quiz/${q['id']}'),
-                                      borderRadius: BorderRadius.circular(20),
-                                      child: Container(
-                                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(20),
-                                          border: Border.all(color: AppColors.border),
-                                        ),
-                                        child: Row(
-                                          children: [
-                                            Container(
-                                              width: 48,
-                                              height: 48,
-                                              decoration: BoxDecoration(color: AppColors.surface, borderRadius: BorderRadius.circular(14)),
-                                              child: const Icon(Icons.quiz_outlined, color: AppColors.textPrimary),
-                                            ),
-                                            const SizedBox(width: 14),
-                                            Expanded(
-                                              child: Column(
-                                                crossAxisAlignment: CrossAxisAlignment.start,
-                                                children: [
-                                                  Text(q['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                                                  Text(
-                                                    '$questionCount questions · ${q['total_marks']} marks · ${q['time_limit_minutes'] ?? '-'} min',
-                                                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
-                                                  ),
-                                                ],
-                                              ),
-                                            ),
-                                            Material(
-                                              color: AppColors.accent,
-                                              borderRadius: BorderRadius.circular(100),
-                                              child: InkWell(
-                                                onTap: () => context.push('/quiz/${q['id']}/take'),
-                                                borderRadius: BorderRadius.circular(100),
-                                                child: const Padding(
-                                                  padding: EdgeInsets.all(10),
-                                                  child: Icon(Icons.play_arrow, color: AppColors.white, size: 20),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                  ),
-                                );
-                              },
-                              childCount: _quizzes.length,
-                            ),
-                          ),
-                        ),
                 ],
               ),
+            ),
+            Expanded(
+              child: _loading
+                  ? const Center(child: CircularProgressIndicator())
+                  : _visibleQuizzes.isEmpty
+                      ? Center(child: Text(_levelQuizzes.isEmpty ? 'No quizzes yet' : 'No quizzes for $_filter'))
+                      : ListView.builder(
+                          padding: const EdgeInsets.fromLTRB(20, 0, 20, 20),
+                          itemCount: _visibleQuizzes.length,
+                          itemBuilder: (context, i) => _QuizListTile(quiz: _visibleQuizzes[i]),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _QuizListTile extends StatelessWidget {
+  const _QuizListTile({required this.quiz});
+
+  final Map<String, dynamic> quiz;
+
+  @override
+  Widget build(BuildContext context) {
+    final questionCount = (quiz['questions'] as List?)?.length ?? 0;
+    final metadata = quiz['metadata_extra'] as Map<String, dynamic>? ?? {};
+    final subjectKey = metadata['subject'] as String?;
+    final level = QuizSubjects.levelLabel(metadata['level'] as String?);
+
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 12),
+      child: Material(
+        color: AppColors.white,
+        borderRadius: BorderRadius.circular(20),
+        child: InkWell(
+          onTap: () => context.push('/quiz/${quiz['id']}'),
+          borderRadius: BorderRadius.circular(20),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: AppColors.border),
+            ),
+            child: Row(
+              children: [
+                SubjectIcon(subjectKey: subjectKey),
+                const SizedBox(width: 14),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(quiz['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
+                      const SizedBox(height: 4),
+                      Text(
+                        [
+                          if (level.isNotEmpty) level,
+                          '$questionCount questions',
+                          '${quiz['total_marks']} marks',
+                          if (quiz['time_limit_minutes'] != null) '${quiz['time_limit_minutes']} min',
+                        ].join(' · '),
+                        style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+                Material(
+                  color: AppColors.accent,
+                  borderRadius: BorderRadius.circular(100),
+                  child: InkWell(
+                    onTap: () => context.push('/quiz/${quiz['id']}/take'),
+                    borderRadius: BorderRadius.circular(100),
+                    child: const Padding(
+                      padding: EdgeInsets.all(10),
+                      child: Icon(Icons.play_arrow, color: AppColors.white, size: 20),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -174,11 +231,37 @@ class _TakeQuizScreenState extends ConsumerState<TakeQuizScreen> {
   String? _attemptId;
   final Map<String, String> _answers = {};
   bool _loading = true;
+  bool _submitting = false;
+  Timer? _quizTimer;
+  int? _remainingSeconds;
 
   @override
   void initState() {
     super.initState();
     _init();
+  }
+
+  @override
+  void dispose() {
+    _quizTimer?.cancel();
+    super.dispose();
+  }
+
+  void _startQuizTimer(int? minutes) {
+    _quizTimer?.cancel();
+    if (minutes == null || minutes <= 0) return;
+
+    setState(() => _remainingSeconds = minutes * 60);
+    _quizTimer = Timer.periodic(const Duration(seconds: 1), (_) {
+      if (!mounted || _remainingSeconds == null) return;
+      if (_remainingSeconds! <= 1) {
+        _quizTimer?.cancel();
+        setState(() => _remainingSeconds = 0);
+        _submit(timedOut: true);
+        return;
+      }
+      setState(() => _remainingSeconds = _remainingSeconds! - 1);
+    });
   }
 
   Future<void> _init() async {
@@ -187,11 +270,13 @@ class _TakeQuizScreenState extends ConsumerState<TakeQuizScreen> {
       final quizRes = await dio.get('/quizzes/${widget.quizId}');
       final attemptRes = await dio.post('/quizzes/${widget.quizId}/attempts');
       if (!mounted) return;
+      final quiz = Map<String, dynamic>.from(quizRes.data);
       setState(() {
-        _quiz = Map<String, dynamic>.from(quizRes.data);
+        _quiz = quiz;
         _attemptId = attemptRes.data['id'];
         _loading = false;
       });
+      _startQuizTimer(_parseMinutes(quiz['time_limit_minutes']));
     } catch (_) {
       if (!mounted) return;
       setState(() => _loading = false);
@@ -200,18 +285,39 @@ class _TakeQuizScreenState extends ConsumerState<TakeQuizScreen> {
     }
   }
 
-  Future<void> _submit() async {
-    if (_attemptId == null) return;
-    final dio = ref.read(dioProvider);
-    final questions = _quiz?['questions'] as List? ?? [];
-    await dio.put('/attempts/$_attemptId/answers', data: {
-      'answers': questions.map((q) => {
-            'question_id': q['id'],
-            'selected_answer': _answers[q['id']],
-          }).toList(),
-    });
-    final res = await dio.post('/attempts/$_attemptId/submit');
-    if (mounted) context.push('/review/$_attemptId', extra: res.data);
+  int? _parseMinutes(dynamic value) {
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return int.tryParse(value.toString());
+  }
+
+  Future<void> _submit({bool timedOut = false}) async {
+    if (_attemptId == null || _submitting) return;
+    _submitting = true;
+    _quizTimer?.cancel();
+
+    try {
+      final dio = ref.read(dioProvider);
+      final questions = _quiz?['questions'] as List? ?? [];
+      await dio.put('/attempts/$_attemptId/answers', data: {
+        'answers': questions.map((q) => {
+              'question_id': q['id'],
+              'selected_answer': _answers[q['id']],
+            }).toList(),
+      });
+      final res = await dio.post('/attempts/$_attemptId/submit');
+      if (!mounted) return;
+      if (timedOut) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Time is up! Quiz submitted.')));
+      }
+      context.push('/review/$_attemptId', extra: res.data);
+    } catch (_) {
+      if (mounted) {
+        _submitting = false;
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not submit quiz')));
+      }
+    }
   }
 
   int _answeredCount(List questions) {
@@ -238,6 +344,13 @@ class _TakeQuizScreenState extends ConsumerState<TakeQuizScreen> {
       appBar: AppBar(
         title: Text(_quiz?['title'] ?? 'Quiz'),
         actions: [
+          if (_remainingSeconds != null)
+            Padding(
+              padding: const EdgeInsets.only(right: 8),
+              child: Center(
+                child: _QuizTimerBadge(remainingSeconds: _remainingSeconds!),
+              ),
+            ),
           IconButton(
             icon: const Icon(Icons.favorite_border),
             onPressed: () async {
@@ -342,7 +455,7 @@ class _TakeQuizScreenState extends ConsumerState<TakeQuizScreen> {
               child: Material(
                 color: AppColors.accent.withValues(alpha: 0.3),
                 child: InkWell(
-                  onTap: _submit,
+                  onTap: _submitting ? null : _submit,
                   child: Stack(
                     fit: StackFit.expand,
                     children: [
@@ -369,6 +482,35 @@ class _TakeQuizScreenState extends ConsumerState<TakeQuizScreen> {
               ),
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _QuizTimerBadge extends StatelessWidget {
+  const _QuizTimerBadge({required this.remainingSeconds});
+
+  final int remainingSeconds;
+
+  @override
+  Widget build(BuildContext context) {
+    final urgent = remainingSeconds <= 60;
+    return Material(
+      color: urgent ? AppColors.error : AppColors.black,
+      borderRadius: BorderRadius.circular(14),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.timer_outlined, color: AppColors.white, size: 16),
+            const SizedBox(width: 6),
+            Text(
+              formatTimerSeconds(remainingSeconds),
+              style: const TextStyle(color: AppColors.white, fontWeight: FontWeight.w700, fontSize: 13),
+            ),
+          ],
         ),
       ),
     );
@@ -426,9 +568,10 @@ class ReviewScreen extends ConsumerWidget {
         final questions = data['questions'] as List;
 
         return Scaffold(
+          backgroundColor: AppColors.background,
           appBar: AppBar(title: const Text('Review Answers')),
           body: ListView(
-            padding: const EdgeInsets.all(16),
+            padding: const EdgeInsets.fromLTRB(20, 8, 20, 24),
             children: [
               Card(
                 child: Padding(
@@ -453,6 +596,22 @@ class ReviewScreen extends ConsumerWidget {
                     ),
                   )),
             ],
+          ),
+          bottomNavigationBar: Container(
+            padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+            decoration: const BoxDecoration(
+              color: AppColors.white,
+              border: Border(top: BorderSide(color: AppColors.border)),
+            ),
+            child: SafeArea(
+              child: SizedBox(
+                height: 52,
+                child: ElevatedButton(
+                  onPressed: () => context.go('/home'),
+                  child: const Text('Go home'),
+                ),
+              ),
+            ),
           ),
         );
       },

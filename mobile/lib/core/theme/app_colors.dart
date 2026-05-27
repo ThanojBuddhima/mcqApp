@@ -20,4 +20,13 @@ class AppColors {
   // Semantic — only for status feedback
   static const success = Color(0xFF22C55E);
   static const error = Color(0xFFEF4444);
+
+  // Subject palette — A/L
+  static const alPhysicsBlue = Color(0xFF1D4ED8);
+  static const alChemistryYellow = Color(0xFFEAB308);
+  static const alBiologyGreen = Color(0xFF15803D);
+
+  // Subject palette — O/L
+  static const olMathsBlue = Color(0xFF0284C7);
+  static const olScienceGreen = Color(0xFF10B981);
 }
