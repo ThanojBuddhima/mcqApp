@@ -152,7 +152,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   ),
                 ),
               ],
-              SectionHeader(title: 'Categories', onSeeAll: () => context.push('/past-papers')),
+              SectionHeader(title: 'Categories'),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),
                 child: GridView.count(
@@ -176,19 +176,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       onTap: () => context.push('/quiz/${q['id']}'),
                     ),
                   )),
-              Padding(
-                padding: const EdgeInsets.all(20),
-                child: Wrap(
-                  spacing: 10,
-                  runSpacing: 10,
-                  children: [
-                    _chip('Upload paper', Icons.upload_outlined, () => context.push('/upload')),
-                    _chip('Past papers', Icons.menu_book_outlined, () => context.push('/past-papers')),
-                    _chip('AI assistant', Icons.auto_awesome_outlined, () => context.push('/ai')),
-                    _chip('Classes', Icons.groups_outlined, () => context.push('/classes')),
-                  ],
-                ),
-              ),
             ],
           ),
         ),
@@ -212,15 +199,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
           Text(label, style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
           Text(value, style: const TextStyle(color: AppColors.textPrimary, fontWeight: FontWeight.w600, fontSize: 15)),
         ],
-      );
-
-  Widget _chip(String label, IconData icon, VoidCallback onTap) => OutlinedButton.icon(
-        onPressed: onTap,
-        icon: Icon(icon, size: 18),
-        label: Text(label),
-        style: OutlinedButton.styleFrom(
-          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        ),
       );
 }
 
