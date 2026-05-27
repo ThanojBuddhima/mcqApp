@@ -54,7 +54,7 @@ class UserRegister(BaseModel):
         return validate_strong_password(value)
 
     @model_validator(mode="after")
-    def passwords_match(self):
+    def validate_registration(self):
         if self.password != self.confirm_password:
             raise ValueError("Passwords do not match")
         return self
@@ -76,6 +76,7 @@ class UserResponse(BaseModel):
     email: str
     display_name: str
     grade: str | None = None
+    stream: str | None = None
     role: UserRole
     profile: dict = {}
     is_active: bool

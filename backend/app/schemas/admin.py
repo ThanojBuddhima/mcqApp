@@ -41,6 +41,7 @@ class AdminUserItem(BaseModel):
     email: str
     display_name: str
     grade: str | None = None
+    stream: str | None = None
     role: UserRole
     is_active: bool
     created_at: datetime

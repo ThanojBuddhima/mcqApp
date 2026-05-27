@@ -102,5 +102,12 @@ class AppTheme {
           shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
           behavior: SnackBarBehavior.floating,
         ),
+        pageTransitionsTheme: const PageTransitionsTheme(
+          builders: {
+            TargetPlatform.android: FadeUpwardsPageTransitionsBuilder(),
+            TargetPlatform.iOS: CupertinoPageTransitionsBuilder(),
+            TargetPlatform.macOS: CupertinoPageTransitionsBuilder(),
+          },
+        ),
       );
 }

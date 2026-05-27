@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../../../routing/page_transitions.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class AdminShell extends StatelessWidget {
@@ -32,7 +33,7 @@ class AdminShell extends StatelessWidget {
           ),
         ],
       ),
-      body: navigationShell,
+      body: AnimatedTabBody(navigationShell: navigationShell),
       bottomNavigationBar: Container(
         decoration: const BoxDecoration(
           color: AppColors.white,
@@ -76,9 +77,19 @@ class _NavItem extends StatelessWidget {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(icon, color: color, size: 22),
+            AnimatedScale(
+              scale: selected ? 1.08 : 1,
+              duration: AppDurations.fast,
+              curve: AppCurves.emphasized,
+              child: Icon(icon, color: color, size: 22),
+            ),
             const SizedBox(height: 4),
-            Text(label, style: TextStyle(color: color, fontSize: 10, fontWeight: selected ? FontWeight.w600 : FontWeight.w400)),
+            AnimatedDefaultTextStyle(
+              duration: AppDurations.fast,
+              curve: AppCurves.emphasized,
+              style: TextStyle(color: color, fontSize: 10, fontWeight: selected ? FontWeight.w600 : FontWeight.w400),
+              child: Text(label),
+            ),
           ],
         ),
       ),

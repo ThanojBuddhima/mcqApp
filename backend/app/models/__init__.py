@@ -76,6 +76,7 @@ class User(Base):
     google_id: Mapped[str | None] = mapped_column(String(255), unique=True, nullable=True)
     display_name: Mapped[str] = mapped_column(String(255), nullable=False)
     grade: Mapped[str | None] = mapped_column(String(10), nullable=True)
+    stream: Mapped[str | None] = mapped_column(String(20), nullable=True)
     role: Mapped[UserRole] = mapped_column(Enum(UserRole), default=UserRole.STUDENT, nullable=False)
     profile: Mapped[dict] = mapped_column(JSONB, default=dict)
     is_active: Mapped[bool] = mapped_column(Boolean, default=True)

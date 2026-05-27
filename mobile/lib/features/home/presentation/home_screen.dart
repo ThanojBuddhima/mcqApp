@@ -5,6 +5,7 @@ import 'package:go_router/go_router.dart';
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
 import '../../../shared/widgets/section_header.dart';
+import '../utils/grade_categories.dart';
 import '../../auth/providers/auth_provider.dart';
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -45,6 +46,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final progress = (_analytics?['avg_percentage'] as num?)?.toInt() ?? 0;
     final attempts = _analytics?['total_attempts'] ?? 0;
     final firstQuiz = _quizzes.isNotEmpty ? _quizzes.first : null;
+    final grade = user?['grade'] as String?;
+    final categories = GradeCategories.forGrade(grade);
 
     return Scaffold(
       backgroundColor: AppColors.background,
@@ -61,7 +64,6 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   children: [
                     _iconBtn(Icons.menu_outlined, () {}),
                     const Spacer(),
-                    _iconBtn(Icons.notifications_none_outlined, () {}),
                   ],
                 ),
               ),
@@ -154,12 +156,9 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
                   childAspectRatio: 1.5,
-                  children: [
-                    _CategoryCard('Physics', '12 papers', Icons.science_outlined, () => context.push('/past-papers')),
-                    _CategoryCard('Mathematics', '18 papers', Icons.calculate_outlined, () => context.push('/past-papers')),
-                    _CategoryCard('Biology', '10 papers', Icons.biotech_outlined, () => context.push('/past-papers')),
-                    _CategoryCard('Chemistry', '8 papers', Icons.water_drop_outlined, () => context.push('/past-papers')),
-                  ],
+                  children: categories
+                      .map((c) => _CategoryCard(c.title, c.subtitle, c.icon, () => context.push('/past-papers')))
+                      .toList(),
                 ),
               ),
               SectionHeader(title: 'Recent quizzes', onSeeAll: () => context.go('/quizzes')),

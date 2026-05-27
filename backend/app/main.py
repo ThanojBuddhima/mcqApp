@@ -14,6 +14,7 @@ async def lifespan(app: FastAPI):
     async with engine.begin() as conn:
         await conn.run_sync(Base.metadata.create_all)
         await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS grade VARCHAR(10)"))
+        await conn.execute(text("ALTER TABLE users ADD COLUMN IF NOT EXISTS stream VARCHAR(20)"))
     yield
     await engine.dispose()
 
