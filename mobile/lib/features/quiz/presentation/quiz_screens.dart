@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../../core/network/api_client.dart';
 import '../../../core/theme/app_colors.dart';
+import '../providers/quiz_list_provider.dart';
 
 class QuizListScreen extends ConsumerStatefulWidget {
   const QuizListScreen({super.key});
@@ -24,6 +25,7 @@ class _QuizListScreenState extends ConsumerState<QuizListScreen> {
   }
 
   Future<void> _load() async {
+    setState(() => _loading = true);
     try {
       final dio = ref.read(dioProvider);
       final res = await dio.get('/quizzes', queryParameters: {'status': 'published'});
@@ -38,6 +40,10 @@ class _QuizListScreenState extends ConsumerState<QuizListScreen> {
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<int>(quizListRefreshProvider, (prev, next) {
+      if (prev != next) _load();
+    });
+
     return Scaffold(
       backgroundColor: AppColors.background,
       body: SafeArea(
@@ -89,6 +95,7 @@ class _QuizListScreenState extends ConsumerState<QuizListScreen> {
                             delegate: SliverChildBuilderDelegate(
                               (context, i) {
                                 final q = _quizzes[i];
+                                final questionCount = (q['questions'] as List?)?.length ?? 0;
                                 return Padding(
                                   padding: const EdgeInsets.only(bottom: 12),
                                   child: Material(
@@ -117,8 +124,10 @@ class _QuizListScreenState extends ConsumerState<QuizListScreen> {
                                                 crossAxisAlignment: CrossAxisAlignment.start,
                                                 children: [
                                                   Text(q['title'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 15)),
-                                                  Text('${q['total_marks']} marks · ${q['time_limit_minutes'] ?? '-'} min',
-                                                      style: const TextStyle(color: AppColors.textSecondary, fontSize: 13)),
+                                                  Text(
+                                                    '$questionCount questions · ${q['total_marks']} marks · ${q['time_limit_minutes'] ?? '-'} min',
+                                                    style: const TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                                                  ),
                                                 ],
                                               ),
                                             ),
@@ -126,7 +135,7 @@ class _QuizListScreenState extends ConsumerState<QuizListScreen> {
                                               color: AppColors.accent,
                                               borderRadius: BorderRadius.circular(100),
                                               child: InkWell(
-                                                onTap: () => context.push('/quiz/${q['id']}'),
+                                                onTap: () => context.push('/quiz/${q['id']}/take'),
                                                 borderRadius: BorderRadius.circular(100),
                                                 child: const Padding(
                                                   padding: EdgeInsets.all(10),
@@ -173,14 +182,22 @@ class _TakeQuizScreenState extends ConsumerState<TakeQuizScreen> {
   }
 
   Future<void> _init() async {
-    final dio = ref.read(dioProvider);
-    final quizRes = await dio.get('/quizzes/${widget.quizId}');
-    final attemptRes = await dio.post('/quizzes/${widget.quizId}/attempts');
-    setState(() {
-      _quiz = Map<String, dynamic>.from(quizRes.data);
-      _attemptId = attemptRes.data['id'];
-      _loading = false;
-    });
+    try {
+      final dio = ref.read(dioProvider);
+      final quizRes = await dio.get('/quizzes/${widget.quizId}');
+      final attemptRes = await dio.post('/quizzes/${widget.quizId}/attempts');
+      if (!mounted) return;
+      setState(() {
+        _quiz = Map<String, dynamic>.from(quizRes.data);
+        _attemptId = attemptRes.data['id'];
+        _loading = false;
+      });
+    } catch (_) {
+      if (!mounted) return;
+      setState(() => _loading = false);
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Could not start quiz')));
+      context.pop();
+    }
   }
 
   Future<void> _submit() async {
@@ -197,10 +214,25 @@ class _TakeQuizScreenState extends ConsumerState<TakeQuizScreen> {
     if (mounted) context.push('/review/$_attemptId', extra: res.data);
   }
 
+  int _answeredCount(List questions) {
+    return questions.where((q) {
+      final id = q['id'];
+      final answer = _answers[id];
+      return answer != null && answer.isNotEmpty;
+    }).length;
+  }
+
+  int _progressPercent(List questions) {
+    if (questions.isEmpty) return 0;
+    return ((_answeredCount(questions) / questions.length) * 100).round();
+  }
+
   @override
   Widget build(BuildContext context) {
     if (_loading) return const Scaffold(body: Center(child: CircularProgressIndicator()));
     final questions = _quiz?['questions'] as List? ?? [];
+    final answered = _answeredCount(questions);
+    final progress = _progressPercent(questions);
 
     return Scaffold(
       appBar: AppBar(
@@ -218,39 +250,162 @@ class _TakeQuizScreenState extends ConsumerState<TakeQuizScreen> {
         ],
       ),
       body: ListView.builder(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.all(20),
         itemCount: questions.length,
         itemBuilder: (context, i) {
           final q = questions[i];
           final options = q['options'] as List? ?? [];
-          return Card(
-            margin: const EdgeInsets.only(bottom: 16),
-            child: Padding(
+          final selected = _answers[q['id']];
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 16),
+            child: Container(
               padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: AppColors.white,
+                borderRadius: BorderRadius.circular(20),
+                border: Border.all(color: AppColors.border),
+              ),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('Q${i + 1}. ${q['question_text']}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
+                  Text('Question ${i + 1}', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 13, color: AppColors.textSecondary)),
+                  const SizedBox(height: 8),
+                  Text(q['question_text'] ?? '', style: const TextStyle(fontWeight: FontWeight.w600, fontSize: 16)),
                   if (q['question_image_url'] != null) ...[
-                    const SizedBox(height: 8),
+                    const SizedBox(height: 12),
                     Image.network(q['question_image_url'], height: 120, fit: BoxFit.contain),
                   ],
-                  const SizedBox(height: 12),
-                  ...options.map((o) => RadioListTile<String>(
-                        title: Text(o['option_text'] ?? ''),
-                        value: o['label'],
-                        groupValue: _answers[q['id']],
-                        onChanged: (v) => setState(() => _answers[q['id']] = v!),
-                      )),
+                  const SizedBox(height: 16),
+                  ...options.map((o) {
+                    final opt = o as Map<String, dynamic>;
+                    final label = opt['label'] as String? ?? '';
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Container(
+                            width: 24,
+                            height: 24,
+                            alignment: Alignment.center,
+                            decoration: BoxDecoration(
+                              color: AppColors.surface,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Text(label, style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w700)),
+                          ),
+                          const SizedBox(width: 10),
+                          Expanded(child: Text(opt['option_text'] ?? '', style: const TextStyle(fontSize: 15))),
+                        ],
+                      ),
+                    );
+                  }),
+                  const SizedBox(height: 16),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: options.map((o) {
+                      final opt = o as Map<String, dynamic>;
+                      final label = opt['label'] as String? ?? '';
+                      return Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 6),
+                        child: _AnswerSelectButton(
+                          label: label,
+                          selected: selected == label,
+                          onTap: () => setState(() {
+                            if (selected == label) {
+                              _answers.remove(q['id']);
+                            } else {
+                              _answers[q['id']] = label;
+                            }
+                          }),
+                        ),
+                      );
+                    }).toList(),
+                  ),
                 ],
               ),
             ),
           );
         },
       ),
-      bottomNavigationBar: Padding(
-        padding: const EdgeInsets.all(16),
-        child: ElevatedButton(onPressed: _submit, child: const Text('Submit Quiz')),
+      bottomNavigationBar: Container(
+        padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+        decoration: const BoxDecoration(
+          color: AppColors.white,
+          border: Border(top: BorderSide(color: AppColors.border)),
+        ),
+        child: SafeArea(
+          child: SizedBox(
+            height: 52,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(100),
+              child: Material(
+                color: AppColors.accent.withValues(alpha: 0.3),
+                child: InkWell(
+                  onTap: _submit,
+                  child: Stack(
+                    fit: StackFit.expand,
+                    children: [
+                      FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: progress / 100,
+                        child: const ColoredBox(color: AppColors.accent),
+                      ),
+                      Center(
+                        child: Text(
+                          progress == 100
+                              ? 'Submit quiz · 100%'
+                              : 'Submit quiz · $progress% ($answered/${questions.length})',
+                          style: const TextStyle(
+                            color: AppColors.white,
+                            fontWeight: FontWeight.w600,
+                            fontSize: 15,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _AnswerSelectButton extends StatelessWidget {
+  const _AnswerSelectButton({required this.label, required this.selected, required this.onTap});
+
+  final String label;
+  final bool selected;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: selected ? AppColors.black : AppColors.white,
+      shape: CircleBorder(
+        side: BorderSide(color: selected ? AppColors.black : AppColors.border, width: selected ? 2 : 1),
+      ),
+      child: InkWell(
+        onTap: onTap,
+        customBorder: const CircleBorder(),
+        child: SizedBox(
+          width: 36,
+          height: 36,
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w700,
+                color: selected ? AppColors.white : AppColors.textPrimary,
+              ),
+            ),
+          ),
+        ),
       ),
     );
   }

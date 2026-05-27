@@ -59,7 +59,7 @@ class MainShell extends ConsumerWidget {
               children: [
                 Expanded(child: _NavItem(icon: Icons.home_outlined, label: 'Home', selected: navigationShell.currentIndex == 0, onTap: () => _onTap(0))),
                 Expanded(child: _NavItem(icon: Icons.menu_book_outlined, label: 'Courses', selected: navigationShell.currentIndex == 1, onTap: () => _onTap(1))),
-                _CenterUploadButton(onTap: () => context.push('/upload')),
+                _CenterUploadButton(onTap: () => context.push('/quiz/create')),
                 Expanded(child: _NavItem(icon: Icons.bar_chart_outlined, label: 'Progress', selected: navigationShell.currentIndex == 2, onTap: () => _onTap(2))),
                 Expanded(child: _NavItem(icon: Icons.person_outline, label: 'Profile', selected: navigationShell.currentIndex == 3, onTap: () => _onTap(3))),
               ],

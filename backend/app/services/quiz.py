@@ -107,7 +107,9 @@ class QuizService:
             raise ValueError("Quiz must have at least one question")
         quiz.status = QuizStatus.PUBLISHED
         await db.flush()
-        return quiz
+        reloaded = await self.get_by_id(db, quiz.id)
+        assert reloaded is not None
+        return reloaded
 
     async def generate_share_code(self, db: AsyncSession, quiz: Quiz) -> str:
         code = generate_share_code()

@@ -11,6 +11,8 @@ import '../../features/engagement/presentation/engagement_screens.dart';
 import '../../features/home/presentation/home_screen.dart';
 import '../../features/past_papers/presentation/past_papers_screen.dart';
 import '../../features/productivity/presentation/timer_screen.dart';
+import '../../features/quiz/presentation/create_quiz_screen.dart';
+import '../../features/quiz/presentation/quiz_detail_screen.dart';
 import '../../features/quiz/presentation/quiz_screens.dart';
 import '../../features/upload/presentation/upload_screen.dart';
 import '../../shared/widgets/main_shell.dart';
@@ -94,9 +96,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         builder: (_, s) => QuizEditorScreen(quizId: s.pathParameters['id']!),
       ),
       appRoute(
-        path: '/quiz/:id',
+        path: '/quiz/:id/take',
         transition: AppTransition.sharedAxis,
         builder: (_, s) => TakeQuizScreen(quizId: s.pathParameters['id']!),
+      ),
+      appRoute(
+        path: '/quiz/:id',
+        transition: AppTransition.sharedAxis,
+        builder: (_, s) => QuizDetailScreen(quizId: s.pathParameters['id']!),
       ),
       appRoute(
         path: '/leaderboard/:quizId',

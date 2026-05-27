@@ -24,7 +24,9 @@ class AttemptService:
         )
         db.add(attempt)
         await db.flush()
-        return attempt
+        reloaded = await self.get_attempt(db, attempt.id)
+        assert reloaded is not None
+        return reloaded
 
     async def get_attempt(self, db: AsyncSession, attempt_id: UUID) -> QuizAttempt | None:
         result = await db.execute(
@@ -90,7 +92,9 @@ class AttemptService:
 
         await leaderboard_service.update_score(db, attempt)
         await db.flush()
-        return attempt
+        reloaded = await self.get_attempt(db, attempt.id)
+        assert reloaded is not None
+        return reloaded
 
     async def get_review(self, db: AsyncSession, attempt: QuizAttempt) -> dict:
         result = await db.execute(

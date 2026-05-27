@@ -18,7 +18,7 @@ router = APIRouter()
 async def create_quiz(
     data: QuizCreate,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_tutor),
+    user: User = Depends(get_current_user),
 ):
     quiz = await quiz_service.create(db, user.id, data)
     return quiz
@@ -76,7 +76,7 @@ async def update_quiz(
 async def publish_quiz(
     quiz_id: UUID,
     db: AsyncSession = Depends(get_db),
-    user: User = Depends(require_tutor),
+    user: User = Depends(get_current_user),
 ):
     quiz = await quiz_service.get_by_id(db, quiz_id)
     if quiz is None:

@@ -88,63 +88,6 @@ class _PastPapersScreenState extends ConsumerState<PastPapersScreen> {
   }
 }
 
-class CreateQuizScreen extends ConsumerStatefulWidget {
-  const CreateQuizScreen({super.key});
-
-  @override
-  ConsumerState<CreateQuizScreen> createState() => _CreateQuizScreenState();
-}
-
-class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
-  final _title = TextEditingController();
-  final _questions = <Map<String, dynamic>>[];
-
-  Future<void> _save() async {
-    final dio = ref.read(dioProvider);
-    await dio.post('/quizzes', data: {
-      'title': _title.text,
-      'time_limit_minutes': 30,
-      'questions': _questions,
-    });
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Quiz created')));
-      context.pop();
-    }
-  }
-
-  void _addQuestion() {
-    setState(() {
-      _questions.add({
-        'order_index': _questions.length,
-        'type': 'mcq',
-        'question_text': 'Sample question ${_questions.length + 1}',
-        'marks': 1,
-        'options': [
-          {'label': 'A', 'option_text': 'Option A', 'is_correct': true},
-          {'label': 'B', 'option_text': 'Option B', 'is_correct': false},
-        ],
-      });
-    });
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('Create Quiz')),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          TextField(controller: _title, decoration: const InputDecoration(labelText: 'Quiz Title')),
-          const SizedBox(height: 16),
-          ElevatedButton.icon(onPressed: _addQuestion, icon: const Icon(Icons.add), label: const Text('Add Question')),
-          ..._questions.asMap().entries.map((e) => ListTile(title: Text('Q${e.key + 1}: ${e.value['question_text']}'))),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton.extended(onPressed: _save, label: const Text('Save'), icon: const Icon(Icons.save)),
-    );
-  }
-}
-
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
 
