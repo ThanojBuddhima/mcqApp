@@ -1,0 +1,3 @@
+# OCR extras — install in worker image for full PaddleOCR support
+paddlepaddle==2.6.2
+paddleocr==2.9.1
