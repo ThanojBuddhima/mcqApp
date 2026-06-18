@@ -72,9 +72,45 @@ class DocumentProcessor:
         quiz_json = parse_with_ai_sync(clusters, self.gemini_api_key, title=filename)
 
         progress("done", 100)
+
+        # Build per-page data for persistence
+        pages_data = []
+        for page in processed_pages:
+            page_layout = [b for b in all_layout if b.page_index == page.page_index]
+            pages_data.append({
+                "page_index": page.page_index,
+                "image_url": f"jobs/{job_id}/pages/{page.page_index}.webp",
+                "layout_json": [
+                    {
+                        "block_id": b.block_id,
+                        "block_type": b.block_type,
+                        "bbox": b.bbox,
+                        "confidence": b.confidence,
+                    }
+                    for b in page_layout
+                ],
+            })
+
+        # Build OCR block data for persistence
+        ocr_blocks_data = [
+            {
+                "block_id": b.block_id,
+                "page_index": b.page_index,
+                "block_type": "text",
+                "bbox": b.bbox,
+                "ocr_text": b.text,
+                "ocr_lang": b.lang,
+                "confidence": b.confidence,
+                "needs_review": b.needs_review,
+            }
+            for b in all_ocr
+        ]
+
         return {
             "quiz_json": quiz_json,
             "page_count": len(processed_pages),
             "clusters_count": len(clusters),
             "ocr_blocks_count": len(all_ocr),
+            "pages_data": pages_data,
+            "ocr_blocks": ocr_blocks_data,
         }

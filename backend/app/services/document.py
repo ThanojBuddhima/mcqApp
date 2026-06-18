@@ -2,8 +2,9 @@ from uuid import UUID, uuid4
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
-from app.models import DocumentJob, DocumentJobStatus
+from app.models import DocumentJob, DocumentJobStatus, DocumentPage
 from app.services.storage import storage_service
 
 
@@ -46,6 +47,23 @@ class DocumentService:
             query = query.where(DocumentJob.user_id == user_id)
         result = await db.execute(query)
         return result.scalar_one_or_none()
+
+    async def get_job_by_quiz_id(self, db: AsyncSession, quiz_id: UUID, user_id: UUID | None = None) -> DocumentJob | None:
+        query = select(DocumentJob).where(DocumentJob.result_quiz_id == quiz_id)
+        if user_id:
+            query = query.where(DocumentJob.user_id == user_id)
+        result = await db.execute(query)
+        return result.scalar_one_or_none()
+
+    async def get_job_pages(self, db: AsyncSession, job_id: UUID) -> list[DocumentPage]:
+        query = (
+            select(DocumentPage)
+            .where(DocumentPage.job_id == job_id)
+            .options(selectinload(DocumentPage.blocks))
+            .order_by(DocumentPage.page_index)
+        )
+        result = await db.execute(query)
+        return list(result.scalars().all())
 
     async def update_job_status(
         self,

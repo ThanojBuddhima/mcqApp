@@ -217,6 +217,54 @@ class _UploadScreenState extends ConsumerState<UploadScreen> {
                         padding: const EdgeInsets.only(top: 8),
                         child: Text(_jobStatus!['error_log'], style: const TextStyle(color: AppColors.error, fontSize: 13)),
                       ),
+                    if (status == 'failed') ...[
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _jobId = null;
+                              _jobStatus = null;
+                            });
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Try again'),
+                        ),
+                      ),
+                    ],
+                    if (status == 'completed' && _jobStatus?['result_quiz_id'] != null) ...[
+                      const SizedBox(height: 16),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () => context.push('/quiz/edit/${_jobStatus!['result_quiz_id']}'),
+                          icon: const Icon(Icons.edit_outlined),
+                          label: const Text('Review & edit quiz'),
+                        ),
+                      ),
+                    ],
+                    if (status == 'completed' && _jobStatus?['result_quiz_id'] == null) ...[
+                      const SizedBox(height: 12),
+                      const Text(
+                        'Processing completed but no questions were extracted. Try uploading a clearer image.',
+                        style: TextStyle(color: AppColors.textSecondary, fontSize: 13),
+                      ),
+                      const SizedBox(height: 12),
+                      SizedBox(
+                        width: double.infinity,
+                        child: ElevatedButton.icon(
+                          onPressed: () {
+                            setState(() {
+                              _jobId = null;
+                              _jobStatus = null;
+                            });
+                          },
+                          icon: const Icon(Icons.refresh),
+                          label: const Text('Try again'),
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),

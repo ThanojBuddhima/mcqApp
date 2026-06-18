@@ -12,8 +12,10 @@ from sqlalchemy.orm import sessionmaker
 
 from app.core.config import settings
 from app.models import (
+    DocumentBlock,
     DocumentJob,
     DocumentJobStatus,
+    DocumentPage,
     Question,
     QuestionOption,
     QuestionType,
@@ -104,6 +106,35 @@ def process_document_task(self, job_id: str):
                         or str(opt.get("id")) == str(q_data.get("correctAnswer")),
                     )
                 )
+
+        # Persist DocumentPage and DocumentBlock records
+        page_id_map = {}  # page_index -> DocumentPage.id
+        for page_data in result.get("pages_data", []):
+            page_url = storage_service.get_public_url(page_data["image_url"])
+            doc_page = DocumentPage(
+                job_id=job.id,
+                page_index=page_data["page_index"],
+                image_url=page_url,
+                layout_json=page_data.get("layout_json", {}),
+            )
+            db.add(doc_page)
+            db.flush()
+            page_id_map[page_data["page_index"]] = doc_page.id
+
+        for block_data in result.get("ocr_blocks", []):
+            page_id = page_id_map.get(block_data["page_index"])
+            if page_id is None:
+                continue
+            doc_block = DocumentBlock(
+                page_id=page_id,
+                block_type=block_data.get("block_type", "text"),
+                bbox=block_data.get("bbox", []),
+                ocr_text=block_data.get("ocr_text"),
+                ocr_lang=block_data.get("ocr_lang"),
+                confidence=block_data.get("confidence"),
+                needs_review=block_data.get("needs_review", False),
+            )
+            db.add(doc_block)
 
         job.result_quiz_id = quiz.id
         job.page_count = result["page_count"]

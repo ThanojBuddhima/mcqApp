@@ -7,7 +7,7 @@ from app.core.config import settings
 from app.core.database import get_db
 from app.core.deps import get_current_user
 from app.models import User
-from app.schemas.document import DocumentJobResponse, DocumentPreviewResponse
+from app.schemas.document import DocumentJobResponse, DocumentPageResponse, DocumentPreviewResponse
 from app.services.document import document_service
 from app.services.quiz import quiz_service
 from app.workers.tasks import process_document_task
@@ -80,3 +80,29 @@ async def confirm_job(
     if not job.result_quiz_id:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="No quiz generated yet")
     return job
+
+
+@router.get("/jobs/{job_id}/pages", response_model=list[DocumentPageResponse])
+async def get_job_pages(
+    job_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    job = await document_service.get_job(db, job_id, user.id)
+    if job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
+    pages = await document_service.get_job_pages(db, job_id)
+    return pages
+
+
+@router.get("/by-quiz/{quiz_id}/pages", response_model=list[DocumentPageResponse])
+async def get_pages_by_quiz_id(
+    quiz_id: UUID,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+):
+    job = await document_service.get_job_by_quiz_id(db, quiz_id, user.id)
+    if job is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="No document job found for this quiz")
+    pages = await document_service.get_job_pages(db, job.id)
+    return pages
