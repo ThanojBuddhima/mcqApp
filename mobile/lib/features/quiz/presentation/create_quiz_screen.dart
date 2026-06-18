@@ -15,9 +15,10 @@ class _QuestionDraft {
 
   final TextEditingController questionController = TextEditingController();
   final List<TextEditingController> optionControllers;
-  int correctIndex = 0;
-  bool correctAnswerConfirmed = false;
-  final int optionCount;
+  int? correctIndex;
+  int optionCount;
+
+  bool get correctAnswerConfirmed => correctIndex != null;
 
   bool get isComplete {
     if (questionController.text.trim().isEmpty) return false;
@@ -92,17 +93,24 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
   void _setOptionCount(int count) {
     if (count == _optionCount) return;
     setState(() {
-      final existing = _questions.length;
-      for (final q in _questions) {
-        q.dispose();
-      }
       _optionCount = count;
-      _questions
-        ..clear()
-        ..addAll(List.generate(existing, (_) => _QuestionDraft(optionCount: count)));
-      _questionKeys
-        ..clear()
-        ..addAll(List.generate(existing, (_) => GlobalKey()));
+      for (final q in _questions) {
+        if (count > q.optionCount) {
+          while (q.optionCount < count) {
+            q.optionControllers.add(TextEditingController());
+            q.optionCount++;
+          }
+        } else if (count < q.optionCount) {
+          while (q.optionCount > count) {
+            final c = q.optionControllers.removeLast();
+            c.dispose();
+            q.optionCount--;
+          }
+          if (q.correctIndex != null && q.correctIndex! >= count) {
+            q.correctIndex = null;
+          }
+        }
+      }
     });
   }
 
@@ -135,7 +143,6 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
     setState(() {
       final q = _questions[questionIndex];
       q.correctIndex = correctIndex;
-      q.correctAnswerConfirmed = true;
     });
     _maybeAutoAddQuestion(questionIndex);
   }
@@ -394,7 +401,10 @@ class _CreateQuizScreenState extends ConsumerState<CreateQuizScreen> {
                 canRemove: _questions.length > 1,
                 onRemove: () => _removeQuestion(index),
                 onCorrectChanged: (i) => _handleCorrectSelected(index, i),
-                onFieldsChanged: () => setState(() {}),
+                onFieldsChanged: () {
+                  setState(() {});
+                  _maybeAutoAddQuestion(index);
+                },
               ),
             );
           }),
